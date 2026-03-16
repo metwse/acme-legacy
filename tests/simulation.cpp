@@ -44,9 +44,12 @@ int main() {
     Interpreter intr { std::move(parser) };
 
     uint16_t tk;
-    while ((tk = lex.next()) != TK_EOF)
-        assert(intr.pump(tk, nullptr) != RDESC_NOMATCH,
+    while ((tk = lex.next()) != TK_EOF) {
+        void *seminfo = lex.get_current_seminfo();
+
+        assert(intr.pump(tk, &seminfo) != RDESC_NOMATCH,
                "syntax error");
+    }
 
     Simulation sim { intr };
 
