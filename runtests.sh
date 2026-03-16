@@ -8,7 +8,7 @@ fi
 MODE="${DEBUG:+debug}"
 MODE="${MODE:-release}"
 
-make tests
+make tests -j
 
 DIST_DIR='target'
 

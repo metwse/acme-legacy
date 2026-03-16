@@ -32,7 +32,7 @@ public:
 /** @brief Decimal table value. */
 class TVNum : public TableValue {
 public:
-    TVNum(struct rdesc_node &);
+    TVNum(struct rdesc_node *);
 
     virtual ~TVNum() = default;
 
@@ -55,7 +55,7 @@ public:
 /** @brief Position aliasing a port of an unit. */
 class TVPointIdent : public TVPoint {
 public:
-    TVPointIdent(struct rdesc_node &);
+    TVPointIdent(struct rdesc_node *);
 
     virtual ~TVPointIdent() = default;
 
@@ -68,7 +68,7 @@ public:
 /** @brief Numeric position. */
 class TVPointNum : public TVPoint {
 public:
-    TVPointNum(struct rdesc_node &);
+    TVPointNum(struct rdesc_node *, struct rdesc_node *);
 
     virtual ~TVPointNum() = default;
 
@@ -83,7 +83,7 @@ public:
 /** @brief Path of an wire or shape of a lookup table. */
 class TVPath : public TableValue {
 public:
-    TVPath(struct rdesc_node &);
+    TVPath() = default;
 
     virtual ~TVPath() = default;
 
@@ -120,7 +120,7 @@ public:
 /** @brief Extra information table for statements. */
 class Table {
 public:
-    Table(std::map<TableKeyId, std::unique_ptr<TableValue>>  table_)
+    Table(std::map<TableKeyId, std::unique_ptr<TableValue>> table_)
         : table { std::move(table_) } {}
 
     Table(Table &&other)

@@ -9,9 +9,6 @@
 
 #include "table.hpp"
 
-#include <rdesc/cfg.h>
-#include <rdesc/rdesc.h>
-
 #include <cstddef>
 #include <set>
 #include <utility>

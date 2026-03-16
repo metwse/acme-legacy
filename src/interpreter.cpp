@@ -1,106 +1,72 @@
 #include "../include/interpreter.hpp"
 #include "../include/grammar.hpp"
-#include "../include/lex.hpp"
 #include "../include/table.hpp"
-#include "detail.h"
 
-#include "interpreter.ixx"
+#include "../rdesc/include/rdesc.h"
+#include "../rdesc/include/cst_macros.h"
 
-#include <rdesc/cfg.h>
-#include <rdesc/rdesc.h>
-
+#include <cstdint>
+#include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-#include <stdexcept>
 
-using std::vector, std::map;
-using std::unique_ptr, std::make_unique;
+using std::vector;
+using std::map;
+using std::piecewise_construct;
+using std::forward_as_tuple;
 using std::string;
-using std::piecewise_construct, std::forward_as_tuple;
+using std::unique_ptr, std::make_unique;
 
 
-static auto get_rrr_ident_id(struct rdesc_node *ls) {
-    vector<size_t> res;
+template <typename T>
+static T get_seminfo(struct rdesc_node *n) {
+    T *seminfo;
+    memcpy(&seminfo, rseminfo(n), sizeof(void *));
+    T copy = *seminfo;
 
-    traverse_rrr_list(ls, [&](auto *entry) {
-        res.push_back(get_seminfo<IdentInfo>(entry)->id);
+    delete seminfo;
+    return copy;
+}
+
+template<typename Fn>
+void Interpreter::traverse_rrr_list(struct rdesc_node *n, Fn process) {
+    process(rchild(p(), n, 0));
+
+    while (true) {
+        n = rchild(p(), n, rchild_count(n) - 1);
+        if (rvariant(n) == 1)
+            break;
+
+        process(rchild(p(), n, 1));
+    }
+}
+
+template<typename T>
+vector<T> Interpreter::get_rrr_seminfo(struct rdesc_node *n) {
+    vector<T> res;
+
+    traverse_rrr_list(n, [&](struct rdesc_node *entry) {
+        res.push_back(get_seminfo<T>(entry));
     });
 
     return res;
-}  // GCOVR_EXCL_LINE
-
-
-TVNum::TVNum(struct rdesc_node &num)
-    : decimal { get_seminfo<NumInfo>(&num)->decimal() } {}
-
-TVPointIdent::TVPointIdent(struct rdesc_node &point)
-    : id { get_seminfo<IdentInfo>(point.nt.children[0])->id } {}
-
-TVPointNum::TVPointNum(struct rdesc_node &num)
-    : x { get_seminfo<NumInfo>(num.nt.children[1])->decimal() },
-      y { get_seminfo<NumInfo>(num.nt.children[3])->decimal() } {}
-
-static unique_ptr<TVPoint> interpret_tvpoint(struct rdesc_node &point) {
-    switch (point.nt.variant) {
-    case 0: /* ident */
-        return make_unique<TVPointIdent>(point);
-    case 1: /* num, num */
-        return make_unique<TVPointNum>(point);
-    default: unreachable();  // GCOVR_EXCL_LINE
-    }
 }
 
-TVPath::TVPath(struct rdesc_node &path_ls) {
-    paths.push_back({});
-    size_t i = 0;
 
-    traverse_rrr_list(path_ls.nt.children[1], [&](auto *entry, auto *delim) {
-        paths[i].push_back(interpret_tvpoint(*entry));
+TVNum::TVNum(struct rdesc_node *num)
+    : decimal { get_seminfo<NumInfo>(num).decimal() } {}
 
-        if (delim && delim->nt.children[0]->tk.id == TK_SEMI) {
-            paths.push_back({});
-            i++;
-        }
-    });
-}
+TVPointIdent::TVPointIdent(struct rdesc_node *point)
+    : id { get_seminfo<IdentInfo>(point).id } {}
 
-unique_ptr<TableValue> Interpreter::interpret_table_value(struct rdesc_node &tv) {
-    struct rdesc_node &child = *tv.nt.children[0];
-    switch (tv.nt.variant) {
-    case 0: /* num */
-        return make_unique<TVNum>(child);
-    case 1: /* tv_point */
-        return interpret_tvpoint(child);
-    case 2: /* tv_path */
-        return make_unique<TVPath>(child);
-    default: unreachable();  // GCOVR_EXCL_LINE
-    }
-}
+TVPointNum::TVPointNum(struct rdesc_node *x, struct rdesc_node *y)
+    : x { get_seminfo<NumInfo>(x).decimal() },
+      y { get_seminfo<NumInfo>(y).decimal() } {}
 
-Table Interpreter::interpret_table(struct rdesc_node &n) {
-    map<TableKeyId, unique_ptr<TableValue>> table;
-
-    if (n.nt.child_count == 0)
-        return Table { std::move(table) };
-
-    auto ls = n.nt.children[0]->nt.children[1];
-
-    traverse_rrr_list(ls, [&](auto *entry) {
-        TableKeyId key = get_seminfo<IdentInfo>(entry->nt.children[0])->id;
-
-        table.emplace(
-            piecewise_construct,
-            forward_as_tuple(key),
-            forward_as_tuple(interpret_table_value(*entry->nt.children[2]))
-        );
-    });
-
-
-    return Table { std::move(table) };
-}
 
 static void parse_lut_num_info(vector<bool> &table,
                                size_t input_variant_count,
@@ -140,14 +106,73 @@ static void parse_lut_num_info(vector<bool> &table,
     }
 }
 
-void Interpreter::interpret_lut(struct rdesc_node &lut) {
-    auto nt = lut.nt;
+unique_ptr<TableValue> Interpreter::interpret_table_value(struct rdesc_node *tv) {
+    auto interpret_tvpoint = [&](struct rdesc_node *point) -> unique_ptr<TVPoint> {
+        switch (rvariant(point)) {
+        case 0: /* ident */
+            return make_unique<TVPointIdent>(rchild(p(), point, 0));
+        case 1: /* num, num */
+            return make_unique<TVPointNum>(rchild(p(), point, 1),
+                                           rchild(p(), point, 3));
+        default: unreachable();  // GCOVR_EXCL_LINE
+        }
+    };
 
-    size_t input_size = get_seminfo<NumInfo>(nt.children[2])->decimal();
-    size_t output_size = get_seminfo<NumInfo>(nt.children[4])->decimal();
-    LutId id = get_seminfo<IdentInfo>(nt.children[6])->id;
+    struct rdesc_node *child = rchild(p(), tv, 0);
+    switch (rvariant(tv)) {
+    case 0: /* num */
+        return make_unique<TVNum>(child);
+    case 1: /* tv_point */
+        return interpret_tvpoint(child);
+    case 2: { /* tv_path */
+        auto res = make_unique<TVPath>();
 
-    auto lookup_table_ = get_rrr_seminfo<NumInfo>(nt.children[9]);
+        res->paths.push_back({});
+        size_t i = 0;
+
+        traverse_rrr_list(rchild(p(), child, 1), [&](auto *entry) {
+            auto delim = rchild(p(), rparent(p(), entry), 0);
+            if (rid(rchild(p(), delim, 0)) == TK_SEMI) {
+                res->paths.push_back({});
+                i++;
+            }
+
+            res->paths[i].push_back(interpret_tvpoint(entry));
+        });
+
+        return res;
+    } default: unreachable();  // GCOVR_EXCL_LINE
+    }
+}
+
+Table Interpreter::interpret_table(struct rdesc_node *n) {
+    map<TableKeyId, unique_ptr<TableValue>> table;
+
+    if (rchild_count(n) == 0)
+        return Table { std::move(table) };
+
+    auto ls = rchild(p(), rchild(p(), n, 0), 1);
+
+    traverse_rrr_list(ls, [&](auto *entry) {
+        TableKeyId key = get_seminfo<IdentInfo>(rchild(p(), entry, 0)).id;
+
+        table.emplace(
+            piecewise_construct,
+            forward_as_tuple(key),
+            forward_as_tuple(interpret_table_value(rchild(p(), entry, 2)))
+        );
+    });
+
+
+    return Table { std::move(table) };
+}
+
+void Interpreter::interpret_lut(struct rdesc_node *lut) {
+    size_t input_size = get_seminfo<NumInfo>(rchild(p(), lut, 2)).decimal();
+    size_t output_size = get_seminfo<NumInfo>(rchild(p(), lut, 4)).decimal();
+    LutId id = get_seminfo<IdentInfo>(rchild(p(), lut, 6)).id;
+
+    auto lookup_table_ = get_rrr_seminfo<NumInfo>(rchild(p(), lut, 9));
     /* end of serialization */
 
     if (lookup_table_.size() != output_size)
@@ -159,24 +184,22 @@ void Interpreter::interpret_lut(struct rdesc_node &lut) {
     lookup_table.reserve((1 << input_size) * output_size);
 
     for (auto &output_values : lookup_table_)
-        parse_lut_num_info(lookup_table, 1 << input_size, *output_values);
+        parse_lut_num_info(lookup_table, 1 << input_size, output_values);
 
     luts.emplace(
         piecewise_construct,
         forward_as_tuple(id),
         forward_as_tuple(
-            interpret_table(*nt.children[11]),
+            interpret_table(rchild(p(), lut, 11)),
             id, input_size, output_size,
             std::move(lookup_table)
         )
     );
 };
 
-void Interpreter::interpret_wire(struct rdesc_node &wire) {
-    auto nt = wire.nt;
-
-    WireId id = get_seminfo<IdentInfo>(nt.children[1])->id;
-    bool state = get_seminfo<NumInfo>(nt.children[3])->decimal() != 0;
+void Interpreter::interpret_wire(struct rdesc_node *wire) {
+    WireId id = get_seminfo<IdentInfo>(rchild(p(), wire, 1)).id;
+    bool state = get_seminfo<NumInfo>(rchild(p(), wire, 3)).decimal() != 0;
     /* end of serialization */
     /* end of validation */
 
@@ -184,19 +207,25 @@ void Interpreter::interpret_wire(struct rdesc_node &wire) {
         piecewise_construct,
         forward_as_tuple(id),
         forward_as_tuple(
-            interpret_table(*nt.children[4]), id, state
+            interpret_table(rchild(p(), wire, 4)), id, state
         )
     );
 };
 
-void Interpreter::interpret_unit(struct rdesc_node &unit) {
-    auto nt = unit.nt;
+void Interpreter::interpret_unit(struct rdesc_node *unit) {
+    LutId lut_id = get_seminfo<IdentInfo>(rchild(p(), unit, 2)).id;
+    LutId id = get_seminfo<IdentInfo>(rchild(p(), unit, 4)).id;
 
-    LutId lut_id = get_seminfo<IdentInfo>(nt.children[2])->id;
-    LutId id = get_seminfo<IdentInfo>(nt.children[4])->id;
+    auto input_wires_ = get_rrr_seminfo<IdentInfo>(rchild(p(), unit, 7));
+    auto output_wires_ = get_rrr_seminfo<IdentInfo>(rchild(p(), unit, 11));
 
-    auto input_wires = get_rrr_ident_id(nt.children[7]);
-    auto output_wires = get_rrr_ident_id(nt.children[11]);
+    vector<WireId> input_wires;
+    for (auto &i : input_wires_)
+        input_wires.push_back(i.id);
+
+    vector<WireId> output_wires;
+    for (auto &o : output_wires_)
+        output_wires.push_back(o.id);
     /* end of serialization */
 
     auto validate_input_wires = [this](const auto &wire_ids) {
@@ -226,7 +255,7 @@ void Interpreter::interpret_unit(struct rdesc_node &unit) {
         piecewise_construct,
         forward_as_tuple(id),
         forward_as_tuple(
-            interpret_table(*nt.children[13]),
+            interpret_table(rchild(p(), unit, 13)),
             id, lut_id,
             std::move(input_wires),
             std::move(output_wires)
@@ -234,43 +263,41 @@ void Interpreter::interpret_unit(struct rdesc_node &unit) {
     );
 };
 
-enum rdesc_result Interpreter::pump(struct rdesc_cfg_token tk) {
-    struct rdesc_node *cst = NULL;
-
-    auto res = rdesc.pump(&cst, &tk);
+enum rdesc_result Interpreter::pump(uint16_t id, void *seminfo) {
+    auto res = rdesc.pump(id, seminfo);
 
     switch (res) {
     case RDESC_CONTINUE:
         return RDESC_CONTINUE;
     case RDESC_NOMATCH:
-        rdesc.reset(tk_destroyer);
+        rdesc.reset();
         rdesc.start(START_SYM);
         return RDESC_NOMATCH;
     default:
         break;
     }
 
-    struct rdesc_node &stmt = *cst->nt.children[0];
+    struct rdesc_node *stmt = rchild(p(), rdesc.root(), 0);
 
     try {
-        switch (stmt.nt.id) {
-        case NT_LUT:
-            interpret_lut(stmt);
-            break;
-        case NT_WIRE:
-            interpret_wire(stmt);
-            break;
-        case NT_UNIT:
-            interpret_unit(stmt);
-            break;
+        if (rtype(stmt) == RDESC_NONTERMINAL) {
+            switch (rid(stmt)) {
+            case NT_LUT:
+                interpret_lut(stmt);
+                break;
+            case NT_WIRE:
+                interpret_wire(stmt);
+                break;
+            case NT_UNIT:
+                interpret_unit(stmt);
+                break;
+            }
         }
     } catch (...) {
-        rdesc_node_destroy(cst, NULL);
         rdesc.start(START_SYM);
         throw;
     }
 
-    rdesc_node_destroy(cst, NULL);
     rdesc.start(START_SYM);
     return RDESC_READY;
 }

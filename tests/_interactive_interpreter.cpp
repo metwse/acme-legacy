@@ -2,8 +2,6 @@
 #include "../include/core.hpp"
 #include "../include/lex.hpp"
 
-#include <rdesc/rdesc.h>
-
 #include <iostream>
 #include <string>
 #include <utility>
@@ -13,7 +11,7 @@ using std::string;
 
 
 int main() {
-    auto parser = global_cfg()->new_parser();
+    auto parser = global_grammar()->new_parser();
 
     Lex lex { cin };
 
@@ -23,8 +21,9 @@ int main() {
     while (true) {
         do {
             auto tk = lex.next();
+            void *seminfo = lex.get_current_seminfo();
 
-            res = intr.pump(tk);
+            res = intr.pump(tk, &seminfo);
         } while (res == RDESC_CONTINUE);
 
         if (res == RDESC_NOMATCH) {

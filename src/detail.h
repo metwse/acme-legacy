@@ -22,6 +22,8 @@
 		} \
 	} while(0)
 
+#define unwrap(c) assert((c) == 0, "ignored result indicates error")
+
 
 /* macro highlights memory allocation checks */
 #define assert_mem(c) assert(c, "out of memory")

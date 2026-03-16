@@ -6,7 +6,6 @@
 #include "../include/interpreter.hpp"
 
 #include <X11/Xlib.h>
-#include <rdesc/rdesc.h>
 
 #include <memory>
 #include <cstdlib>
@@ -31,23 +30,24 @@ int main(int argc, char *argv[]) {
     ifstream file(argv[1], ios_base::in);
 
     auto lex = make_shared<Lex>(file);
-    auto intr = make_shared<Interpreter>(global_cfg()->new_parser());
+    auto intr = make_shared<Interpreter>(global_grammar()->new_parser());
 
     enum rdesc_result res;
     while (true) {
         auto tk = lex->next();
 
-        if (tk.id == TK_NOTOKEN) {
+        if (tk == TK_NOTOKEN) {
             string line;
             std::getline(file, line);
             cerr << "Syntax error near: \n" << line << endl;
 
             return EXIT_FAILURE;
-        } else if (tk.id == TK_EOF) {
+        } else if (tk == TK_EOF) {
             break;
         }
 
-        res = intr->pump(tk);
+        void *current_seminfo = lex->get_current_seminfo();
+        res = intr->pump(tk, &current_seminfo);
 
         if (res == RDESC_NOMATCH)
             cerr << "Syntax error, ignoring a statement" << endl;

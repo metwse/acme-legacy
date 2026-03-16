@@ -22,8 +22,8 @@ void test_grammar(array<enum tk, size> token_ids,
     for (auto token_id : token_ids) {
         auto lex_token = lex.next();
 
-        auto lex_token_id = (enum tk) lex_token.id;
-        auto lex_token_seminfo = (SemInfo *) lex_token.seminfo;
+        auto lex_token_id = (enum tk) lex_token;
+        auto lex_token_seminfo = (SemInfo *) lex.get_current_seminfo();
 
         delete lex_token_seminfo;
 
@@ -45,9 +45,9 @@ void test_num(array<int, size> base_,
         auto base = base_[i];
         auto num = num_[i];
 
-        auto seminfo = (NumInfo *) token.seminfo;
+        auto seminfo = (NumInfo *) lex.get_current_seminfo();
 
-        assert(token.id == TK_NUM, "token mismatch");
+        assert(token == TK_NUM, "token mismatch");
         assert(num == seminfo->num, "num value mismatch");
         assert(base == seminfo->base, "base mismatch");
 

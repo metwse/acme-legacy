@@ -3,8 +3,7 @@
 #include "../include/lex.hpp"
 #include "../src/detail.h"  // IWYU pragma: keep
 
-#include <rdesc/rdesc.h>
-
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -15,7 +14,7 @@ using std::stringstream;
 
 
 int main() {
-    auto parser = global_cfg()->new_parser();
+    auto parser = global_grammar()->new_parser();
 
     stringstream ss;
     ss << "lut<2, 1> and2 = (0b1000);"
@@ -44,9 +43,9 @@ int main() {
 
     Interpreter intr { std::move(parser) };
 
-    struct rdesc_cfg_token tk;
-    while ((tk = lex.next()).id != TK_EOF)
-        assert(intr.pump(tk) != RDESC_NOMATCH,
+    uint16_t tk;
+    while ((tk = lex.next()) != TK_EOF)
+        assert(intr.pump(tk, nullptr) != RDESC_NOMATCH,
                "syntax error");
 
     Simulation sim { intr };

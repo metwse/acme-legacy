@@ -2,8 +2,7 @@
 #include "../include/grammar.hpp"
 #include "detail.h"
 
-#include <rdesc/cfg.h>
-
+#include <cstdint>
 #include <istream>
 #include <cstddef>
 #include <cctype>
@@ -13,11 +12,11 @@ using std::string;
 using std::ostream;
 
 
-struct rdesc_cfg_token Lex::next() {
+uint16_t Lex::next() {
     char c = skip_space();
 
     if (isspace(c) || s.eof())
-        return { TK_EOF, nullptr };
+        return TK_EOF;
 
     if (c == '/')
         return skip_comment();
@@ -39,10 +38,10 @@ bool is_breaking(char c) {
     return isspace(c) || c == '/';
 }
 
-struct rdesc_cfg_token Lex::skip_comment() {
+uint16_t Lex::skip_comment() {
     if (s.peek() != '*') {
         // syntax error, / should followed by *
-        return { TK_NOTOKEN, nullptr };
+        return TK_NOTOKEN;
     }
 
     char c;
@@ -56,7 +55,7 @@ struct rdesc_cfg_token Lex::skip_comment() {
     }
 
     // syntax error, unterminated comment
-    return { TK_NOTOKEN, nullptr };
+    return TK_NOTOKEN;
 }
 
 char Lex::skip_space() {
@@ -69,7 +68,7 @@ char Lex::skip_space() {
     return c;
 }
 
-struct rdesc_cfg_token Lex::lex_num(char c) {
+uint16_t Lex::lex_num(char c) {
     int base = 10;
     string num;
 
@@ -113,39 +112,38 @@ struct rdesc_cfg_token Lex::lex_num(char c) {
         if (num.length() == 0)
             num += '0';
 
-        auto *seminfo = new NumInfo { base, num };
-
         if (!s.eof())
             s.unget();
 
-        return { TK_NUM, seminfo };
+        current_seminfo = new NumInfo { base, num };
+        return TK_NUM;
     } else {
         // syntax error, probably number continued with an alphanumeric
         // character
-        return { TK_NOTOKEN, nullptr };
+        return TK_NOTOKEN;
     }
 }
 
-struct rdesc_cfg_token Lex::lex_punctuation(char c) {
+uint16_t Lex::lex_punctuation(char c) {
     if (c == '-') {
         char peek = s.get();
         if (peek == '>')
-            return { TK_RARROW, nullptr };
+            return TK_RARROW;
         else
-            return { TK_NOTOKEN, nullptr };  // syntax error, malformed rarrow
+            return TK_NOTOKEN;  // syntax error, malformed rarrow
     }
 
     for (int i = TK_LPAREN; i <= TK_EQ; i++)
         if (c == tk_names[i][0]) {
             lookahead = (enum tk) i;
-            return { i, nullptr }; // punctuation
+            return i; // punctuation
         }
 
 
-    return { TK_NOTOKEN, nullptr };
+    return TK_NOTOKEN;
 }
 
-struct rdesc_cfg_token Lex::lex_ident_or_keyword(char c) {
+uint16_t Lex::lex_ident_or_keyword(char c) {
     string ident;
 
     while (
@@ -162,15 +160,14 @@ struct rdesc_cfg_token Lex::lex_ident_or_keyword(char c) {
 
         for (int i = TK_LUT; i <= TK_UNIT; i++)
             if (ident == tk_names[i]) {
-                return { i, nullptr }; // keyword
+                return i; // keyword
             }
 
-        auto *seminfo = new IdentInfo { Lex::get_ident_id(ident) };
-
-        return { TK_IDENT, seminfo };
+        current_seminfo = new IdentInfo { Lex::get_ident_id(ident) };
+        return TK_IDENT;
     } else {
         // syntax error, invalid token just after the identifier
-        return { TK_NOTOKEN, nullptr };
+        return TK_NOTOKEN;
     }
 }
 

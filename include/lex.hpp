@@ -10,8 +10,6 @@
 #include "grammar.hpp"
 
 #include <cstdint>
-#include <rdesc/cfg.h>
-
 #include <cinttypes>
 #include <cstddef>
 #include <map>
@@ -32,7 +30,12 @@ public:
 
     ~Lex() = default;
 
-    struct rdesc_cfg_token next();
+    uint16_t next();
+    void *get_current_seminfo() {
+        auto hold_seminfo = current_seminfo;
+        current_seminfo = nullptr;
+        return hold_seminfo;
+    };
 
     const std::string &ident_name(size_t i) const;
 
@@ -44,11 +47,13 @@ private:
 
     char skip_space();
 
-    struct rdesc_cfg_token skip_comment();
+    uint16_t skip_comment();
 
-    struct rdesc_cfg_token lex_num(char c);
-    struct rdesc_cfg_token lex_ident_or_keyword(char c);
-    struct rdesc_cfg_token lex_punctuation(char c);
+    uint16_t lex_num(char c);
+    uint16_t lex_ident_or_keyword(char c);
+    uint16_t lex_punctuation(char c);
+
+    void *current_seminfo { nullptr };
 
     std::iostream s;
     enum tk lookahead = TK_NOTOKEN;

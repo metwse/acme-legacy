@@ -3,8 +3,7 @@
 #include "../include/lex.hpp"
 #include "../src/detail.h"  // IWYU pragma: keep
 
-#include <rdesc/rdesc.h>
-
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -16,7 +15,7 @@ using std::stringstream;
 
 template<typename E>
 void tests_should_fail(const char *input) {
-    auto parser = global_cfg()->new_parser();
+    auto parser = global_grammar()->new_parser();
 
     stringstream ss;
     ss << input;
@@ -25,10 +24,14 @@ void tests_should_fail(const char *input) {
     Interpreter intr { std::move(parser) };
 
     try {
-        struct rdesc_cfg_token tk;
-        while ((tk = lex.next()).id != TK_EOF)
-            assert(intr.pump(tk) != RDESC_NOMATCH,
+        uint16_t tk;
+
+        while ((tk = lex.next()) != TK_EOF) {
+            void *current_seminfo = lex.get_current_seminfo();
+
+            assert(intr.pump(tk, &current_seminfo) != RDESC_NOMATCH,
                    "syntax error");
+        }
 
         assert(0, "test should be failed");  // GCOVR_EXCL_LINE
     } catch (E &) {}

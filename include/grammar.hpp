@@ -7,18 +7,13 @@
 #define GRAMMAR_HPP
 
 
-#include <rdesc/cfg.h>
+#include "../rdesc/include/grammar.h"
+#include "../rdesc/include/rule_macros.h"
 
+#include <cstdint>
 #include <memory>
 
-class Cfg;  /* defined in rdesc.hpp */
-
-/** @brief add TK_ prefix in `TK` macro */
-#define PREFIX_TK(tk) TK_ ## tk
-/** @brief add NT_ prefix in `NT` macro */
-#define PREFIX_NT(nt) NT_ ## nt
-
-#include <rdesc/bnf_dsl.h>
+class Grammar;  /* defined in rdesc.hpp */
 
 /** @brief Total number of tokens. */
 #define TK_COUNT 20
@@ -122,13 +117,13 @@ const char *const nt_names[NT_COUNT] = {
 };
 
 /** @brief Context-free grammar. */
-const struct rdesc_cfg_symbol
+const struct rdesc_grammar_symbol
 grammar[NT_COUNT][NT_VARIANT_COUNT][NT_BODY_LENGTH] = {
     /* <stmt> ::= */ r(
-        TK(SEMI),
-    alt NT(LUT), TK(SEMI),
-    alt NT(WIRE), TK(SEMI),
-    alt NT(UNIT), TK(SEMI),
+        TK(SEMI)
+    alt NT(LUT), TK(SEMI)
+    alt NT(WIRE), TK(SEMI)
+    alt NT(UNIT), TK(SEMI)
     ),
 
     /* <lut> ::= */ r(
@@ -136,63 +131,63 @@ grammar[NT_COUNT][NT_VARIANT_COUNT][NT_BODY_LENGTH] = {
         TK(NUM), TK(COMMA), TK(NUM),
         TK(RANGLE_BRACKET), TK(IDENT), TK(EQ),
         TK(LPAREN), NT(NUM_LS), TK(RPAREN),
-        NT(OPTTABLE),
+        NT(OPTTABLE)
     ),
     /* <wire> ::= */ r(
-        TK(WIRE), TK(IDENT), TK(EQ), TK(NUM), NT(OPTTABLE),
+        TK(WIRE), TK(IDENT), TK(EQ), TK(NUM), NT(OPTTABLE)
     ),
     /* <unit> ::= */ r(
         TK(UNIT), TK(LANGLE_BRACKET), TK(IDENT), TK(RANGLE_BRACKET),
         TK(IDENT), TK(EQ),
         TK(LPAREN), NT(IDENT_LS), TK(RPAREN), TK(RARROW),
         TK(LPAREN), NT(IDENT_LS), TK(RPAREN),
-        NT(OPTTABLE),
+        NT(OPTTABLE)
     ),
 
     /* <num_ls> ::= */
-        rrr(NUM_LS, TK(NUM), TK(COMMA)),
+        rrr(NUM_LS, (TK(NUM)), (TK(COMMA), TK(NUM))),
 
     /* <ident_ls> ::= */
-        rrr(IDENT_LS, TK(IDENT), TK(COMMA)),
+        rrr(IDENT_LS, (TK(IDENT)), (TK(COMMA), TK(IDENT))),
 
     /* <table> ::= */ r(
-        TK(LCURLY), NT(TABLE_ENTRY_LS), TK(RCURLY),
+        TK(LCURLY), NT(TABLE_ENTRY_LS), TK(RCURLY)
     ),
     /* <opttable> ::= */
         ropt(NT(TABLE)),
     /* <table_entry> ::= */ r(
-        TK(IDENT), TK(COLON), NT(TABLE_VALUE),
+        TK(IDENT), TK(COLON), NT(TABLE_VALUE)
     ),
     /* <table_entry_ls> ::= */
-        rrr(TABLE_ENTRY_LS, NT(TABLE_ENTRY), TK(COMMA)),
+        rrr(TABLE_ENTRY_LS, (NT(TABLE_ENTRY)), (TK(COMMA), NT(TABLE_ENTRY))),
 
     /* <table_value> ::= */ r(
-        TK(NUM),
-    alt NT(TV_POINT),
-    alt NT(TV_PATH),
+        TK(NUM)
+    alt NT(TV_POINT)
+    alt NT(TV_PATH)
     ),
 
     /* <tv_point> ::= */ r(
-        TK(IDENT),
-    alt TK(LPAREN), TK(NUM), TK(COMMA), TK(NUM), TK(RPAREN),
+        TK(IDENT)
+    alt TK(LPAREN), TK(NUM), TK(COMMA), TK(NUM), TK(RPAREN)
     ),
     /* <tv_point_ls> ::= */
-        rrr(TV_POINT_LS, NT(TV_POINT), NT(TV_POINT_LS_DELIM)),
+        rrr(TV_POINT_LS, (NT(TV_POINT)), (NT(TV_POINT_LS_DELIM), NT(TV_POINT))),
     /* <tv_point_ls_delim> ::= */ r(
-        TK(COMMA),
-    alt TK(SEMI),
+        TK(COMMA)
+    alt TK(SEMI)
     ),
     /* <tv_path> ::= */ r(
-        TK(LBRACKET), NT(TV_POINT_LS), TK(RBRACKET),
+        TK(LBRACKET), NT(TV_POINT_LS), TK(RBRACKET)
     )
 };
 
 
-std::shared_ptr<Cfg> global_cfg();
+std::shared_ptr<Grammar> global_grammar();
 
-void tk_printer(const struct rdesc_cfg_token *, FILE *out);
+void node_printer(const struct rdesc_node *, FILE *out);
 
-void tk_destroyer(struct rdesc_cfg_token *);
+void tk_destroyer(uint16_t, void *);
 
 
 #endif
