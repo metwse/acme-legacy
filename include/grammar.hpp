@@ -185,7 +185,7 @@ grammar[NT_COUNT][NT_VARIANT_COUNT][NT_BODY_LENGTH] = {
 
 std::shared_ptr<Grammar> global_grammar();
 
-void node_printer(const struct rdesc_node *, FILE *out);
+void node_printer(FILE *out, const struct rdesc_node *);
 
 void tk_destroyer(uint16_t, void *);
 

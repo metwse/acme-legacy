@@ -30,7 +30,7 @@ shared_ptr<Grammar> global_grammar() {
     }
 }
 
-void node_printer(const struct rdesc_node *n, FILE *out) {
+void node_printer(FILE *out, const struct rdesc_node *n) {
     if (rtype(n) == RDESC_TOKEN) {
         fprintf(out, "[shape=record,label=\"");
         if (rid(n) == TK_IDENT) {
