@@ -21,9 +21,9 @@ class Grammar;  /* defined in rdesc.hpp */
 /** @brief Total number of non-terminals. */
 #define NT_COUNT 19
 /** @brief Maximum number of variants in a non-terminal. */
-#define NT_VARIANT_COUNT 5
+#define NT_VARIANT_COUNT 4
 /** @brief Maximum number of production symbols in a rule. */
-#define NT_BODY_LENGTH 16
+#define NT_BODY_LENGTH 15
 
 /** @brief Token IDs. */
 enum tk {
@@ -118,7 +118,7 @@ const char *const nt_names[NT_COUNT] = {
 
 /** @brief Context-free grammar. */
 const struct rdesc_grammar_symbol
-grammar[NT_COUNT][NT_VARIANT_COUNT][NT_BODY_LENGTH] = {
+grammar[NT_COUNT][NT_VARIANT_COUNT + 1][NT_BODY_LENGTH + 1] = {
     /* <stmt> ::= */ r(
         TK(SEMI)
     alt NT(LUT), TK(SEMI)

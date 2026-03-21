@@ -38,7 +38,7 @@ void Interpreter::traverse_rrr_list(struct rdesc_node *n, Fn process) {
 
     while (true) {
         n = rchild(p(), n, rchild_count(n) - 1);
-        if (rvariant(n) == 1)
+        if (ralt_id(n) == 1)
             break;
 
         process(rchild(p(), n, 1));
@@ -108,7 +108,7 @@ static void parse_lut_num_info(vector<bool> &table,
 
 unique_ptr<TableValue> Interpreter::interpret_table_value(struct rdesc_node *tv) {
     auto interpret_tvpoint = [&](struct rdesc_node *point) -> unique_ptr<TVPoint> {
-        switch (rvariant(point)) {
+        switch (ralt_id(point)) {
         case 0: /* ident */
             return make_unique<TVPointIdent>(rchild(p(), point, 0));
         case 1: /* num, num */
@@ -119,7 +119,7 @@ unique_ptr<TableValue> Interpreter::interpret_table_value(struct rdesc_node *tv)
     };
 
     struct rdesc_node *child = rchild(p(), tv, 0);
-    switch (rvariant(tv)) {
+    switch (ralt_id(tv)) {
     case 0: /* num */
         return make_unique<TVNum>(child);
     case 1: /* tv_point */

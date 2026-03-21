@@ -41,7 +41,7 @@ RDESC_FEATURES := full
 
 $(RDESC_DIR)/rdesc.mk:
 	git clone https://github.com/metwse/rdesc.git $(RDESC_DIR) \
-		--branch v0.2.0-rc.2
+		--branch v0.2.x
 
 include $(RDESC_DIR)/rdesc.mk
 
